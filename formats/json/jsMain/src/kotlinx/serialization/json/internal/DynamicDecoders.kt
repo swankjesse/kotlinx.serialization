@@ -33,8 +33,8 @@ internal fun <T> Json.decodeDynamic(deserializer: DeserializationStrategy<T>, dy
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-private open class DynamicInput(
-    protected val value: dynamic,
+internal open class DynamicInput(
+    internal val value: dynamic,
     override val json: Json
 ) : NamedValueDecoder(), JsonDecoder {
 

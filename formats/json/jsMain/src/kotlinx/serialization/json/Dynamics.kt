@@ -6,6 +6,8 @@ package kotlinx.serialization.json
 
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
 import kotlinx.serialization.json.internal.*
 
 /**
@@ -70,3 +72,36 @@ public fun <T> Json.encodeToDynamic(serializer: SerializationStrategy<T>, value:
 @ExperimentalSerializationApi
 public inline fun <reified T> Json.encodeToDynamic(value: T): dynamic =
     encodeToDynamic(serializersModule.serializer(), value)
+
+@ExperimentalSerializationApi
+public object DynamicSerializer: KSerializer<Any?> {
+    override val descriptor: SerialDescriptor = buildSerialDescriptor("dynamic", SerialKind.CONTEXTUAL)
+
+    override fun serialize(encoder: Encoder, value: Any?) {
+        when {
+            value == null -> encoder.encodeNull()
+
+            // Fast path: no need to traverse the value.
+            encoder is AbstractEncoder -> encoder.encodeValue(value)
+
+            // Slow path: walk through the value and encode it.
+            else -> {
+                val jsonElement = Json.decodeDynamic(JsonElement.serializer(), value)
+                encoder.asJsonEncoder().encodeJsonElement(jsonElement)
+            }
+        }
+    }
+
+    override fun deserialize(decoder: Decoder): Any? {
+        when (decoder) {
+            // Fast path: no need to traverse the value.
+            is DynamicInput -> return decoder.value
+
+            // Slow path: decode to a JsonElement, then convert to a dynamic.
+            else -> {
+                val jsonElement = decoder.asJsonDecoder().decodeJsonElement()
+                return Json.encodeDynamic(JsonElement.serializer(), jsonElement)
+            }
+        }
+    }
+}
